@@ -18,207 +18,237 @@ class _LoginscreenState extends State<Loginscreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
-  bool isLoading=false;
+  bool isLoading = false;
 
-Future<void> signInFacebook() async {
-  try {
-    final LoginResult loginResult = await FacebookAuth.instance.login();
-    if (loginResult.status == LoginStatus.success) {
-      final OAuthCredential facebookAuthCredential = FacebookAuthProvider.credential(
-        "${loginResult.accessToken?.tokenString}",
-      );
+  Future<void> signInFacebook() async {
+    try {
+      final LoginResult loginResult = await FacebookAuth.instance.login();
+      if (loginResult.status == LoginStatus.success) {
+        final OAuthCredential facebookAuthCredential = FacebookAuthProvider.credential(
+          "${loginResult.accessToken?.tokenString}",
+        );
 
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
-      if (userCredential.additionalUserInfo!.isNewUser) {
-      
-      await FirebaseAuth.instance.signOut();
-      await FacebookAuth.instance.logOut();
+        UserCredential userCredential =
+        await FirebaseAuth.instance.signInWithCredential(facebookAuthCredential);
+        if (userCredential.additionalUserInfo!.isNewUser) {
+          await FirebaseAuth.instance.signOut();
+          await FacebookAuth.instance.logOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No account found. Please sign up first.")),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Facebook Sign-In Failed")),
+          );
+        }
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("No account found with this email. Please sign up first.")),
-      );
-    }else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Facebook Sign-In Failed")),
+        SnackBar(content: Text("Error: $e")),
       );
     }
   }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error: $e")),
-    );
-  }
-}
 
-
-   Future<void> signInGoogle() async {
-  try {
-    final GoogleSignIn googleSignIn = GoogleSignIn();
-    await googleSignIn.signOut(); // Ensure fresh sign-in
-
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    if (googleUser == null) return; // User canceled sign-in
-
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    final UserCredential userCredential =
-        await FirebaseAuth.instance.signInWithCredential(credential);
-    if (userCredential.additionalUserInfo!.isNewUser) {
-      
-      await FirebaseAuth.instance.signOut();
+  Future<void> signInGoogle() async {
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn();
       await googleSignIn.signOut();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("No account found with this email. Please sign up first.")),
-      );
-    } else {
-    
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => HomeScreen()));
-    }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Google Sign In Failed: $e")),
-    );
-  }
-}
 
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential =
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      if (userCredential.additionalUserInfo!.isNewUser) {
+        await FirebaseAuth.instance.signOut();
+        await googleSignIn.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No account found. Please sign up first.")),
+        );
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Google Sign In Failed: $e")),
+      );
+    }
+  }
 
   Future<void> logIn() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
-        isLoading=true;
+        isLoading = true;
       });
-      try{
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: _emailController.text.toString().trim(),
-      password: _passController.text.toString().trim()
-      );
-      SharedPreferences pref=await SharedPreferences.getInstance();
-      await pref.setBool("isLogIn", true);
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>HomeScreen()));
-      
-      }
-      on FirebaseAuthException catch(e){
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passController.text.trim(),
+        );
+        SharedPreferences pref = await SharedPreferences.getInstance();
+        await pref.setBool("isLogIn", true);
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+      } on FirebaseAuthException catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("LogIn Failed ${e.message}"))
+          SnackBar(content: Text("Login Failed: ${e.message}")),
         );
       }
       setState(() {
-        isLoading=false;
+        isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    Text(
-                      "LOG IN",
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade600,
+    return Scaffold(
+      backgroundColor: Colors.blue.shade50,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          bool isWideScreen = constraints.maxWidth > 600;
+
+          return Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: isWideScreen ? 80 : 20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      Text(
+                        "LOG IN",
+                        style: TextStyle(
+                          fontSize: isWideScreen ? 40 : 30,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 30),
-                    CustomTextField(
+                      const SizedBox(height: 20),
+                      CustomTextField(
                         label: "Email",
                         hint: "Enter your email",
                         controller: _emailController,
-                        isPass: false),
-                    SizedBox(height: 20),
-                    CustomTextField(
+                        isPass: false,
+                      ),
+                      const SizedBox(height: 15),
+                      CustomTextField(
                         label: "Password",
                         hint: "Enter your password",
                         controller: _passController,
-                        isPass: true),
-                    SizedBox(height: 40),
-                    InkWell(
-                      onTap: (){
-                        logIn();
-                      },
-                      child: Container(
-                        width: 130,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade600,
-                          borderRadius: BorderRadius.circular(21),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blueGrey.withOpacity(0.8),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            )
-                          ],
-                        ),
-                        child: Center(
-                          child: isLoading ? CircularProgressIndicator() : Text(
-                            "Log In",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.bold,
+                        isPass: true,
+                      ),
+                      const SizedBox(height: 30),
+
+                      InkWell(
+                        onTap: logIn,
+                        borderRadius: BorderRadius.circular(15),
+                        child: Container(
+                          width: isWideScreen ? 180 : 130,
+                          height: 55,
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade700,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.shade900.withOpacity(0.3),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              )
+                            ],
+                          ),
+                          child: Center(
+                            child: isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : Text(
+                              "Log In",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isWideScreen ? 22 : 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                     SizedBox(height: 20),
-                       Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                       children: [
-                         InkWell(
-                               onTap: signInGoogle, 
-                               borderRadius: BorderRadius.circular(50), 
-                               child: CircleAvatar(
-                                 radius: 25, 
-                                 backgroundColor: Colors.white,
-                                 backgroundImage: AssetImage("assets/images/google.png"),
-                               ),
-                             ),
-                              SizedBox(width: 10),
-                         InkWell(
-                               onTap: signInFacebook, 
-                               borderRadius: BorderRadius.circular(50), 
-                               child: CircleAvatar(
-                                 radius: 25, 
-                                 backgroundColor: Colors.white,
-                                 backgroundImage: AssetImage("assets/images/fb.png"),
-                               ),
-                             ),
-                       ],
-                     ),
-                    SizedBox(height: 20,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text("Don't have an account?",style: TextStyle(fontSize: 16,color: Colors.grey),),
-                        TextButton(onPressed: (){
-                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>SignUpScreen()));
-                        }, child: Text("Sign Up",style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold,color: Colors.blue.shade600),))
-                      ],
-                    )
-                  ],
+
+                      const SizedBox(height: 25),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          InkWell(
+                            onTap: signInGoogle,
+                            borderRadius: BorderRadius.circular(50),
+                            child: CircleAvatar(
+                              radius: isWideScreen ? 30 : 25,
+                              backgroundColor: Colors.white,
+                              backgroundImage: const AssetImage("assets/images/google.png"),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.blueGrey.withOpacity(0.5)),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+
+                          InkWell(
+                            onTap: signInFacebook,
+                            borderRadius: BorderRadius.circular(50),
+                            child: CircleAvatar(
+                              radius: isWideScreen ? 30 : 25,
+                              backgroundColor: Colors.white,
+                              backgroundImage: const AssetImage("assets/images/fb.png"),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.blueGrey.withOpacity(0.5)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Don't have an account?",
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                  context, MaterialPageRoute(builder: (context) => SignUpScreen()));
+                            },
+                            child: Text(
+                              "Sign Up",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
